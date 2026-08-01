@@ -1,0 +1,125 @@
+// RelixCore Operations — data model
+// Core v1: Users/roles, Lead Tracker (CRM), Daily Checklist completions.
+// Mirrors the "Lead Tracker (CRM)" tab of RelixCore_Client_Acquisition_System.xlsx
+// and the pipeline stages defined in the Agency Operating Manual, Part 5.1.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  GROWTH_LEAD
+  UPWORK_OWNER
+  FIVERR_OWNER
+  LINKEDIN_OWNER
+  COLD_EMAIL_OWNER
+  SENIOR_EDITOR
+  JUNIOR_EDITOR
+  WEB_DEVELOPER
+  GRAPHIC_DESIGNER
+}
+
+enum Channel {
+  UPWORK
+  FIVERR
+  LINKEDIN_OUTBOUND
+  LINKEDIN_INBOUND
+  COLD_EMAIL
+  DREAM_100
+  REFERRAL
+  PARTNER_AGENCY
+  COMMUNITY
+  OTHER
+}
+
+enum Vertical {
+  YOUTUBE_DOCUMENTARY
+  SHORT_FORM
+  SAAS_TECH
+  REAL_ESTATE
+  PODCAST_PRODUCTION
+  PERSONAL_BRAND
+  ONLINE_COURSE
+}
+
+enum PipelineStage {
+  LEAD
+  QUALIFIED
+  DISCOVERY_CALL
+  PROPOSAL
+  NEGOTIATION
+  WON
+  ONBOARDING
+  DELIVERY
+  UPSELL
+  REFERRAL
+  CASE_STUDY
+  LOST
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  title        String?
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+
+  secondaryRoles     UserRole[]
+  ownedLeads         Lead[]              @relation("LeadOwner")
+  checklistEntries   ChecklistEntry[]
+}
+
+// Additional roles beyond `User.role` (the primary role) — e.g. a Platform
+// Owner who also carries editing shifts. Permissions and checklists are the
+// union of the primary role and every row here.
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  role   Role
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+}
+
+model Lead {
+  id                  String        @id @default(cuid())
+  leadCode            String        @unique
+  companyName         String
+  contactName         String?
+  channel             Channel
+  segment             Vertical?
+  stage               PipelineStage @default(LEAD)
+  estValue            Float?
+  ownerId             String?
+  owner               User?         @relation("LeadOwner", fields: [ownerId], references: [id])
+  dateFirstContacted  DateTime?
+  lastContactDate     DateTime?
+  nextAction          String?
+  nextActionDate      DateTime?
+  notes               String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+}
+
+// One row per (user, date, itemKey) checkbox toggle. itemKey identifies the
+// checklist item within that role's template defined in src/lib/checklists.ts.
+model ChecklistEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  date      String   // YYYY-MM-DD, local calendar day the checklist belongs to
+  itemKey   String
+  completed Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date, itemKey])
+}
