@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { Channel, PipelineStage, Vertical } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { canEditCrm } from "@/lib/roles";
+import { canEditCrm, canViewDashboard } from "@/lib/roles";
 import { logActivity, diffFields } from "@/lib/activityLog";
 
 const emptyToUndefined = (val: unknown) => (val === "" ? undefined : val);
@@ -119,6 +119,12 @@ export async function updateLeadAction(
     : [];
   const ownerNameById = new Map(owners.map((o) => [o.id, o.name]));
 
+  const newNextAction = data.nextAction || null;
+  const newNextActionDate = toDate(data.nextActionDate);
+  const nextActionChanged =
+    newNextAction !== (existing?.nextAction ?? null) ||
+    (newNextActionDate?.getTime() ?? null) !== (existing?.nextActionDate?.getTime() ?? null);
+
   const lead = await prisma.lead.update({
     where: { id: leadId },
     data: {
@@ -131,9 +137,12 @@ export async function updateLeadAction(
       ownerId: data.ownerId || null,
       dateFirstContacted: toDate(data.dateFirstContacted),
       lastContactDate: toDate(data.lastContactDate),
-      nextAction: data.nextAction || null,
-      nextActionDate: toDate(data.nextActionDate),
+      nextAction: newNextAction,
+      nextActionDate: newNextActionDate,
       notes: data.notes || null,
+      // A new/changed next action needs a fresh reminder, even if the
+      // previous one had been marked done.
+      ...(nextActionChanged ? { nextActionDone: false } : {}),
     },
   });
 
@@ -170,6 +179,39 @@ export async function updateLeadAction(
   revalidatePath("/leads");
   revalidatePath("/dashboard");
   redirect("/leads");
+}
+
+export async function markNextActionDoneAction(formData: FormData) {
+  const leadId = String(formData.get("leadId") ?? "");
+  if (!leadId) return;
+
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not signed in.");
+
+  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  if (!lead) return;
+
+  const isManager = canViewDashboard(user.roles);
+  const isOwner = lead.ownerId === user.id;
+  if (!isManager && !isOwner) {
+    throw new Error("Not authorized to update this lead's next action.");
+  }
+
+  await prisma.lead.update({ where: { id: leadId }, data: { nextActionDone: true } });
+
+  await logActivity({
+    actorId: user.id,
+    actorName: user.name,
+    action: "LEAD_UPDATED",
+    entityType: "Lead",
+    entityId: lead.id,
+    entityLabel: `${lead.leadCode} — ${lead.companyName}`,
+    details: [{ field: "Next Action", from: "Pending", to: "Marked done" }],
+  });
+
+  // The notification bell reads due leads in the root layout, so revalidate
+  // the whole app shell rather than just /leads.
+  revalidatePath("/", "layout");
 }
 
 export async function deleteLeadAction(formData: FormData) {

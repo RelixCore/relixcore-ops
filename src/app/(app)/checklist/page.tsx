@@ -2,20 +2,33 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { CHECKLIST_TEMPLATES } from "@/lib/checklists";
-import { ROLE_LABELS, canViewDashboard } from "@/lib/roles";
+import { ROLE_LABELS, canViewDashboard, canManageTeam } from "@/lib/roles";
 import { todayKey } from "@/lib/date";
 import { getTeamChecklistProgress } from "@/lib/checklistProgress";
 import ChecklistBlocks from "@/components/ChecklistBlocks";
+import CustomTaskList from "@/components/CustomTaskList";
 
 export default async function ChecklistPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   const date = todayKey();
+  const isManager = canManageTeam(user.roles);
 
-  const entries = await prisma.checklistEntry.findMany({
-    where: { userId: user.id, date },
-  });
+  const [entries, customTasks, teamMembers] = await Promise.all([
+    prisma.checklistEntry.findMany({ where: { userId: user.id, date } }),
+    prisma.customChecklistTask.findMany({
+      where: { assigneeId: user.id, date },
+      orderBy: { createdAt: "asc" },
+    }),
+    isManager
+      ? prisma.user.findMany({
+          where: { id: { not: user.id } },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+  ]);
   const initialCompleted = Object.fromEntries(entries.map((e) => [e.itemKey, e.completed]));
 
   let teamProgress: Awaited<ReturnType<typeof getTeamChecklistProgress>> = [];
@@ -49,6 +62,19 @@ export default async function ChecklistPage() {
             />
           </div>
         ))}
+      </div>
+
+      <div className="mt-8">
+        <CustomTaskList
+          tasks={customTasks.map((t) => ({
+            id: t.id,
+            text: t.text,
+            completed: t.completed,
+            assignedByName: t.assignedByName,
+          }))}
+          isManager={isManager}
+          teamMembers={teamMembers}
+        />
       </div>
 
       {teamProgress.length > 0 ? (

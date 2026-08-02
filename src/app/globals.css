@@ -44,3 +44,19 @@ body {
   border-color: var(--brand-teal);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-teal) 20%, transparent);
 }
+
+@keyframes flash-alert {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(1.12);
+  }
+}
+
+.animate-flash-alert {
+  animation: flash-alert 1.1s ease-in-out infinite;
+}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/app/actions";
+import NextActionBell, { type NextActionBellItem } from "@/components/NextActionBell";
 
 type NavItem = { href: string; label: string };
 
@@ -12,11 +13,13 @@ export default function Sidebar({
   userName,
   userRoleLabel,
   avatarUrl,
+  dueNextActions,
 }: {
   navItems: NavItem[];
   userName: string;
   userRoleLabel: string;
   avatarUrl?: string | null;
+  dueNextActions: NextActionBellItem[];
 }) {
   const pathname = usePathname();
 
@@ -35,6 +38,8 @@ export default function Sidebar({
           <p className="text-xs leading-tight text-white/50">Operations</p>
         </div>
       </div>
+
+      <NextActionBell items={dueNextActions} />
 
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map((item) => {

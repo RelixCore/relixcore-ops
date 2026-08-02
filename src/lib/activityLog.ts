@@ -69,6 +69,7 @@ export const ACTION_LABELS: Record<ActivityAction, string> = {
   TEAM_MEMBER_DELETED: "Removed team member",
   CHECKLIST_ITEM_COMPLETED: "Completed checklist item",
   CHECKLIST_ITEM_UNCOMPLETED: "Unchecked checklist item",
+  CHECKLIST_TASK_ASSIGNED: "Assigned checklist task",
   ACTIVITY_LOG_PURGED: "Purged activity log",
 };
 
@@ -85,6 +86,7 @@ export const ACTION_CATEGORIES: Record<ActivityAction, ActivityCategory> = {
   TEAM_MEMBER_DELETED: "TEAM",
   CHECKLIST_ITEM_COMPLETED: "CHECKLIST",
   CHECKLIST_ITEM_UNCOMPLETED: "CHECKLIST",
+  CHECKLIST_TASK_ASSIGNED: "CHECKLIST",
   ACTIVITY_LOG_PURGED: "SYSTEM",
 };
 
