@@ -7,6 +7,7 @@ import { Channel, PipelineStage, Vertical } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { canEditCrm } from "@/lib/roles";
+import { logActivity, diffFields } from "@/lib/activityLog";
 
 const emptyToUndefined = (val: unknown) => (val === "" ? undefined : val);
 
@@ -55,7 +56,7 @@ async function nextLeadCode() {
 }
 
 export async function createLeadAction(_prevState: string | undefined, formData: FormData) {
-  await requireCrmEditor();
+  const actor = await requireCrmEditor();
 
   const parsed = leadSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
@@ -65,7 +66,7 @@ export async function createLeadAction(_prevState: string | undefined, formData:
 
   const leadCode = await nextLeadCode();
 
-  await prisma.lead.create({
+  const lead = await prisma.lead.create({
     data: {
       leadCode,
       companyName: data.companyName,
@@ -83,6 +84,15 @@ export async function createLeadAction(_prevState: string | undefined, formData:
     },
   });
 
+  await logActivity({
+    actorId: actor.id,
+    actorName: actor.name,
+    action: "LEAD_CREATED",
+    entityType: "Lead",
+    entityId: lead.id,
+    entityLabel: `${lead.leadCode} — ${lead.companyName}`,
+  });
+
   revalidatePath("/leads");
   revalidatePath("/dashboard");
   redirect("/leads");
@@ -93,7 +103,7 @@ export async function updateLeadAction(
   _prevState: string | undefined,
   formData: FormData
 ) {
-  await requireCrmEditor();
+  const actor = await requireCrmEditor();
 
   const parsed = leadSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
@@ -101,7 +111,15 @@ export async function updateLeadAction(
   }
   const data = parsed.data;
 
-  await prisma.lead.update({
+  const existing = await prisma.lead.findUnique({ where: { id: leadId } });
+
+  const ownerIds = [existing?.ownerId, data.ownerId].filter((id): id is string => !!id);
+  const owners = ownerIds.length
+    ? await prisma.user.findMany({ where: { id: { in: ownerIds } } })
+    : [];
+  const ownerNameById = new Map(owners.map((o) => [o.id, o.name]));
+
+  const lead = await prisma.lead.update({
     where: { id: leadId },
     data: {
       companyName: data.companyName,
@@ -119,17 +137,56 @@ export async function updateLeadAction(
     },
   });
 
+  if (existing) {
+    const diffs = diffFields(existing, lead, [
+      { key: "companyName", label: "Company" },
+      { key: "contactName", label: "Contact" },
+      { key: "channel", label: "Channel" },
+      { key: "segment", label: "Vertical" },
+      { key: "stage", label: "Stage" },
+      { key: "estValue", label: "Est. Value" },
+      {
+        key: "ownerId",
+        label: "Owner",
+        format: (id) => (id ? (ownerNameById.get(id as string) ?? "Unknown") : "Unassigned"),
+      },
+      { key: "nextAction", label: "Next Action" },
+      { key: "notes", label: "Notes" },
+    ]);
+
+    if (diffs.length > 0) {
+      await logActivity({
+        actorId: actor.id,
+        actorName: actor.name,
+        action: "LEAD_UPDATED",
+        entityType: "Lead",
+        entityId: lead.id,
+        entityLabel: `${lead.leadCode} — ${lead.companyName}`,
+        details: diffs,
+      });
+    }
+  }
+
   revalidatePath("/leads");
   revalidatePath("/dashboard");
   redirect("/leads");
 }
 
 export async function deleteLeadAction(formData: FormData) {
-  await requireCrmEditor();
+  const actor = await requireCrmEditor();
   const leadId = String(formData.get("leadId") ?? "");
   if (!leadId) return;
 
-  await prisma.lead.delete({ where: { id: leadId } });
+  const lead = await prisma.lead.delete({ where: { id: leadId } });
+
+  await logActivity({
+    actorId: actor.id,
+    actorName: actor.name,
+    action: "LEAD_DELETED",
+    entityType: "Lead",
+    entityId: lead.id,
+    entityLabel: `${lead.leadCode} — ${lead.companyName}`,
+  });
 
   revalidatePath("/leads");
   revalidatePath("/dashboard");

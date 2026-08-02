@@ -7,7 +7,8 @@ import { revalidatePath } from "next/cache";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { canManageTeam } from "@/lib/roles";
+import { canManageTeam, ROLE_LABELS } from "@/lib/roles";
+import { logActivity, diffFields } from "@/lib/activityLog";
 
 const emptyToUndefined = (val: unknown) => (val === "" ? undefined : val);
 
@@ -34,7 +35,7 @@ function parseSecondaryRoles(formData: FormData, primary: Role): Role[] {
 }
 
 export async function createUserAction(_prevState: string | undefined, formData: FormData) {
-  await requireTeamManager();
+  const actor = await requireTeamManager();
 
   const parsed = baseUserSchema
     .extend({ password: z.string().min(6, "Temporary password must be at least 6 characters") })
@@ -52,7 +53,7 @@ export async function createUserAction(_prevState: string | undefined, formData:
   const secondaryRoles = parseSecondaryRoles(formData, data.role);
   const passwordHash = await bcrypt.hash(data.password, 10);
 
-  await prisma.user.create({
+  const created = await prisma.user.create({
     data: {
       name: data.name,
       email: data.email,
@@ -62,6 +63,15 @@ export async function createUserAction(_prevState: string | undefined, formData:
       passwordHash,
       secondaryRoles: { create: secondaryRoles.map((role) => ({ role })) },
     },
+  });
+
+  await logActivity({
+    actorId: actor.id,
+    actorName: actor.name,
+    action: "TEAM_MEMBER_CREATED",
+    entityType: "User",
+    entityId: created.id,
+    entityLabel: created.name,
   });
 
   revalidatePath("/team");
@@ -74,7 +84,7 @@ export async function updateUserAction(
   _prevState: string | undefined,
   formData: FormData
 ) {
-  await requireTeamManager();
+  const actor = await requireTeamManager();
 
   const parsed = baseUserSchema
     .extend({ password: z.preprocess(emptyToUndefined, z.string().min(6).optional()) })
@@ -84,10 +94,15 @@ export async function updateUserAction(
   }
   const data = parsed.data;
 
-  const existing = await prisma.user.findUnique({ where: { email: data.email } });
-  if (existing && existing.id !== userId) {
+  const existingByEmail = await prisma.user.findUnique({ where: { email: data.email } });
+  if (existingByEmail && existingByEmail.id !== userId) {
     return "A team member with that email already exists.";
   }
+
+  const before = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { secondaryRoles: true },
+  });
 
   const secondaryRoles = parseSecondaryRoles(formData, data.role);
   const passwordHash = data.password ? await bcrypt.hash(data.password, 10) : undefined;
@@ -107,6 +122,38 @@ export async function updateUserAction(
       },
     },
   });
+
+  if (before) {
+    const beforeSecondary = before.secondaryRoles.map((r) => r.role).sort().join(", ");
+    const afterSecondary = [...secondaryRoles].sort().join(", ");
+
+    const diffs = diffFields(
+      { ...before, secondaryRolesLabel: beforeSecondary },
+      { ...before, name: data.name, email: data.email, title: data.title || null, role: data.role, secondaryRolesLabel: afterSecondary },
+      [
+        { key: "name", label: "Name" },
+        { key: "email", label: "Email" },
+        { key: "title", label: "Title" },
+        { key: "role", label: "Primary Role", format: (v) => ROLE_LABELS[v as Role] },
+        { key: "secondaryRolesLabel", label: "Secondary Roles" },
+      ]
+    );
+    if (data.password) {
+      diffs.push({ field: "Password", from: "—", to: "Reset" });
+    }
+
+    if (diffs.length > 0) {
+      await logActivity({
+        actorId: actor.id,
+        actorName: actor.name,
+        action: "TEAM_MEMBER_UPDATED",
+        entityType: "User",
+        entityId: userId,
+        entityLabel: data.name,
+        details: diffs,
+      });
+    }
+  }
 
   revalidatePath("/team");
   revalidatePath("/dashboard");
@@ -142,6 +189,15 @@ export async function deleteUserAction(formData: FormData) {
   }
 
   await prisma.user.delete({ where: { id: userId } });
+
+  await logActivity({
+    actorId: currentUser.id,
+    actorName: currentUser.name,
+    action: "TEAM_MEMBER_DELETED",
+    entityType: "User",
+    entityId: userId,
+    entityLabel: target.name,
+  });
 
   revalidatePath("/team");
   revalidatePath("/dashboard");

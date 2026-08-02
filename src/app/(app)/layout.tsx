@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { combinedRoleLabel, canViewDashboard } from "@/lib/roles";
+import { combinedRoleLabel, canViewDashboard, canManageTeam } from "@/lib/roles";
 import Sidebar from "@/components/Sidebar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -14,6 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/leads", label: "Lead Tracker (CRM)" },
     { href: "/checklist", label: "Daily Checklist" },
     { href: "/team", label: "Team" },
+    ...(canManageTeam(user.roles) ? [{ href: "/activity", label: "Activity Log" }] : []),
   ];
 
   return (

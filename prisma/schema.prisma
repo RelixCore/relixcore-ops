@@ -76,6 +76,7 @@ model User {
   secondaryRoles     UserRole[]
   ownedLeads         Lead[]              @relation("LeadOwner")
   checklistEntries   ChecklistEntry[]
+  activityLogs       ActivityLog[]
 }
 
 // Additional roles beyond `User.role` (the primary role) — e.g. a Platform
@@ -122,4 +123,38 @@ model ChecklistEntry {
   updatedAt DateTime @updatedAt
 
   @@unique([userId, date, itemKey])
+}
+
+enum ActivityAction {
+  LOGIN
+  LOGOUT
+  LEAD_CREATED
+  LEAD_UPDATED
+  LEAD_DELETED
+  TEAM_MEMBER_CREATED
+  TEAM_MEMBER_UPDATED
+  TEAM_MEMBER_DELETED
+  CHECKLIST_ITEM_COMPLETED
+  CHECKLIST_ITEM_UNCOMPLETED
+  ACTIVITY_LOG_PURGED
+}
+
+// Immutable event trail for the Activity Log — one row per meaningful action
+// taken in the app. actorName is a snapshot so history survives the actor's
+// User row being deleted later.
+model ActivityLog {
+  id          String         @id @default(cuid())
+  actorId     String?
+  actor       User?          @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorName   String
+  action      ActivityAction
+  entityType  String?
+  entityId    String?
+  entityLabel String?
+  details     Json?
+  createdAt   DateTime       @default(now())
+
+  @@index([actorId])
+  @@index([createdAt])
+  @@index([action])
 }

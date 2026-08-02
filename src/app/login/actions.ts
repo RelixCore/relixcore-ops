@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword, createSession } from "@/lib/auth";
+import { logActivity } from "@/lib/activityLog";
 
 export async function loginAction(_prevState: string | undefined, formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -23,5 +24,6 @@ export async function loginAction(_prevState: string | undefined, formData: Form
   }
 
   await createSession(user.id);
+  await logActivity({ actorId: user.id, actorName: user.name, action: "LOGIN" });
   redirect("/");
 }
