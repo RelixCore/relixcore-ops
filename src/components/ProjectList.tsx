@@ -55,8 +55,26 @@ export default function ProjectList({
   const [completedById, setCompletedById] = useState(
     Object.fromEntries(projects.map((p) => [p.id, p.completed]))
   );
+  const [selectedAssignees, setSelectedAssignees] = useState<Set<string>>(new Set(["self"]));
   const [, startTransition] = useTransition();
   const [error, formAction, isPending] = useActionState(addProjectAction, undefined);
+
+  function toggleAssignee(id: string) {
+    setSelectedAssignees((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAllAssignees() {
+    setSelectedAssignees(new Set(["self", ...teamMembers.map((m) => m.id)]));
+  }
+
+  function clearAssignees() {
+    setSelectedAssignees(new Set());
+  }
 
   function checkIn(projectId: string) {
     setCheckedInById((prev) => ({ ...prev, [projectId]: true }));
@@ -177,19 +195,45 @@ export default function ProjectList({
           className="rounded-lg border border-border bg-white px-3 py-2 text-sm"
         />
         {isManager ? (
-          <select
-            name="assigneeId"
-            defaultValue="self"
-            className="rounded-lg border border-border bg-white px-3 py-2 text-sm"
-          >
-            <option value="self">Just me</option>
-            <option value="everyone">Everyone</option>
-            {teamMembers.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+          <fieldset className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm">
+            <div className="mb-2 flex items-center justify-between">
+              <legend className="text-xs font-medium text-foreground/60">Assign to</legend>
+              <div className="flex gap-3 text-xs">
+                <button type="button" onClick={selectAllAssignees} className="font-medium text-brand-teal hover:underline">
+                  Select all
+                </button>
+                <button type="button" onClick={clearAssignees} className="font-medium text-foreground/40 hover:underline">
+                  Clear
+                </button>
+              </div>
+            </div>
+            <div className="flex max-h-36 flex-col gap-0.5 overflow-y-auto">
+              <label className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 hover:bg-zinc-50">
+                <input
+                  type="checkbox"
+                  name="assigneeId"
+                  value="self"
+                  checked={selectedAssignees.has("self")}
+                  onChange={() => toggleAssignee("self")}
+                  className="h-3.5 w-3.5 accent-brand-red"
+                />
+                Myself
+              </label>
+              {teamMembers.map((m) => (
+                <label key={m.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 hover:bg-zinc-50">
+                  <input
+                    type="checkbox"
+                    name="assigneeId"
+                    value={m.id}
+                    checked={selectedAssignees.has(m.id)}
+                    onChange={() => toggleAssignee(m.id)}
+                    className="h-3.5 w-3.5 accent-brand-red"
+                  />
+                  {m.name}
+                </label>
+              ))}
+            </div>
+          </fieldset>
         ) : null}
         <button
           type="submit"

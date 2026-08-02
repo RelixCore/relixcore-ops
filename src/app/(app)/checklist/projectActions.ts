@@ -7,9 +7,11 @@ import { canManageTeam } from "@/lib/roles";
 import { todayKey } from "@/lib/date";
 import { logActivity } from "@/lib/activityLog";
 
-// "self" assigns only to the current user (everyone can do this). "everyone"
-// and a specific user id are admin/growth-lead only — same rule as
-// addCustomTaskAction in actions.ts.
+// "self" assigns only to the current user (everyone can do this). Any other
+// checked box (a specific user id, or several at once) is admin/growth-lead
+// only — same rule as addCustomTaskAction in actions.ts. Each checked person
+// gets their own ChecklistProject row, so check-ins/completion are tracked
+// independently per assignee.
 export async function addProjectAction(_prevState: string | undefined, formData: FormData) {
   const user = await getCurrentUser();
   if (!user) throw new Error("Not signed in.");
@@ -24,22 +26,31 @@ export async function addProjectAction(_prevState: string | undefined, formData:
   if (dueDate < startDate) return "Due date can't be in the past.";
 
   const isManager = canManageTeam(user.roles);
-  const target = String(formData.get("assigneeId") ?? "self");
+  const rawTargets = formData.getAll("assigneeId").map(String);
 
   let assigneeIds: string[];
   let assignmentSummary: string;
-  if (!isManager || target === "self" || !target) {
+
+  if (!isManager) {
     assigneeIds = [user.id];
     assignmentSummary = "Self";
-  } else if (target === "everyone") {
-    const all = await prisma.user.findMany({ select: { id: true } });
-    assigneeIds = all.map((u) => u.id);
-    assignmentSummary = `Everyone (${assigneeIds.length})`;
   } else {
-    const assignee = await prisma.user.findUnique({ where: { id: target }, select: { id: true, name: true } });
-    if (!assignee) return "That team member no longer exists.";
-    assigneeIds = [assignee.id];
-    assignmentSummary = assignee.name;
+    const targets = new Set(rawTargets.filter(Boolean));
+    if (targets.size === 0) return "Select at least one person to assign this project to.";
+
+    const includesSelf = targets.delete("self");
+    const specificIds = [...targets];
+
+    const found =
+      specificIds.length > 0
+        ? await prisma.user.findMany({ where: { id: { in: specificIds } }, select: { id: true, name: true } })
+        : [];
+    if (found.length !== specificIds.length) return "One or more selected team members no longer exist.";
+
+    assigneeIds = [...(includesSelf ? [user.id] : []), ...found.map((u) => u.id)];
+    const names = [...(includesSelf ? [user.name] : []), ...found.map((u) => u.name)];
+    assignmentSummary =
+      names.length === 1 ? names[0] : `${names.length} people (${names.slice(0, 3).join(", ")}${names.length > 3 ? ", …" : ""})`;
   }
 
   await prisma.checklistProject.createMany({
