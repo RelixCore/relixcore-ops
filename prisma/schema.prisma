@@ -79,6 +79,8 @@ model User {
   activityLogs           ActivityLog[]
   assignedChecklistTasks CustomChecklistTask[]  @relation("ChecklistTaskAssignee")
   createdChecklistTasks  CustomChecklistTask[]  @relation("ChecklistTaskAssignedBy")
+  assignedProjects       ChecklistProject[]     @relation("ProjectAssignee")
+  createdProjects        ChecklistProject[]     @relation("ProjectAssignedBy")
 }
 
 // Additional roles beyond `User.role` (the primary role) — e.g. a Platform
@@ -148,6 +150,45 @@ model CustomChecklistTask {
   @@index([assigneeId, date])
 }
 
+// A continuous, multi-day piece of work on the Daily Checklist — distinct from
+// CustomChecklistTask (which is a single-day, one-off item). Shows as its own
+// titled section on the Checklist page every day from startDate until it's
+// marked complete, with a green-to-red urgency indicator as dueDate approaches
+// and a required daily check-in (see ChecklistProjectCheckIn) separate from
+// final completion, so a manager can tell "still working on it" apart from
+// "hasn't touched it in days."
+model ChecklistProject {
+  id             String    @id @default(cuid())
+  title          String
+  startDate      String // YYYY-MM-DD
+  dueDate        String // YYYY-MM-DD
+  assigneeId     String
+  assignee       User      @relation("ProjectAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
+  assignedById   String?
+  assignedBy     User?     @relation("ProjectAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedByName String
+  completed      Boolean   @default(false)
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  checkIns ChecklistProjectCheckIn[]
+
+  @@index([assigneeId])
+  @@index([dueDate])
+}
+
+// One row per (project, date) the assignee confirmed they worked on it.
+// Absence of a row for an elapsed active day is a "missed check-in."
+model ChecklistProjectCheckIn {
+  id        String   @id @default(cuid())
+  projectId String
+  project   ChecklistProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  date      String // YYYY-MM-DD
+  checkedAt DateTime @default(now())
+
+  @@unique([projectId, date])
+}
+
 enum ActivityAction {
   LOGIN
   LOGOUT
@@ -160,6 +201,10 @@ enum ActivityAction {
   CHECKLIST_ITEM_COMPLETED
   CHECKLIST_ITEM_UNCOMPLETED
   CHECKLIST_TASK_ASSIGNED
+  PROJECT_ASSIGNED
+  PROJECT_CHECKED_IN
+  PROJECT_COMPLETED
+  PROJECT_DELETED
   ACTIVITY_LOG_PURGED
 }
 

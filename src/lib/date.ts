@@ -23,3 +23,22 @@ export function shiftDateKey(dateKey: string, days: number): string {
   const [year, month, day] = dateKey.split("-").map(Number);
   return dateToKey(new Date(year, month - 1, day + days));
 }
+
+// b - a, in whole days. Safe to use on YYYY-MM-DD keys directly (no Date
+// parsing pitfalls around timezones/DST) since each key is a local calendar day.
+export function daysBetweenKeys(a: string, b: string): number {
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+  const start = new Date(ay, am - 1, ad);
+  const end = new Date(by, bm - 1, bd);
+  return Math.round((end.getTime() - start.getTime()) / 86400000);
+}
+
+// Inclusive list of every date key from `start` to `end` (end >= start).
+export function enumerateDateKeys(start: string, end: string): string[] {
+  const count = daysBetweenKeys(start, end);
+  if (count < 0) return [];
+  const keys: string[] = [];
+  for (let i = 0; i <= count; i++) keys.push(shiftDateKey(start, i));
+  return keys;
+}

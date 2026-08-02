@@ -70,6 +70,10 @@ export const ACTION_LABELS: Record<ActivityAction, string> = {
   CHECKLIST_ITEM_COMPLETED: "Completed checklist item",
   CHECKLIST_ITEM_UNCOMPLETED: "Unchecked checklist item",
   CHECKLIST_TASK_ASSIGNED: "Assigned checklist task",
+  PROJECT_ASSIGNED: "Assigned project",
+  PROJECT_CHECKED_IN: "Checked in on project",
+  PROJECT_COMPLETED: "Completed project",
+  PROJECT_DELETED: "Removed project",
   ACTIVITY_LOG_PURGED: "Purged activity log",
 };
 
@@ -87,6 +91,10 @@ export const ACTION_CATEGORIES: Record<ActivityAction, ActivityCategory> = {
   CHECKLIST_ITEM_COMPLETED: "CHECKLIST",
   CHECKLIST_ITEM_UNCOMPLETED: "CHECKLIST",
   CHECKLIST_TASK_ASSIGNED: "CHECKLIST",
+  PROJECT_ASSIGNED: "CHECKLIST",
+  PROJECT_CHECKED_IN: "CHECKLIST",
+  PROJECT_COMPLETED: "CHECKLIST",
+  PROJECT_DELETED: "CHECKLIST",
   ACTIVITY_LOG_PURGED: "SYSTEM",
 };
 

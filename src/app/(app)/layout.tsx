@@ -21,7 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ];
 
   return (
-    <div className="flex min-h-screen flex-1">
+    <div className="flex min-h-screen flex-1 flex-col lg:flex-row">
       <Sidebar
         navItems={navItems}
         userName={user.name}
@@ -32,7 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         avatarUrl={user.avatarUrl}
         dueNextActions={dueNextActions}
       />
-      <main className="flex-1 overflow-y-auto bg-background px-8 py-8">
+      <main className="flex-1 overflow-y-auto bg-background px-4 py-6 sm:px-8 sm:py-8">
         <div className="mx-auto max-w-6xl">{children}</div>
       </main>
     </div>
