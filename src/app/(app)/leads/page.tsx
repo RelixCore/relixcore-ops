@@ -36,7 +36,7 @@ export default async function LeadsPage({
 
   const leads = await prisma.lead.findMany({
     where,
-    include: { owner: true },
+    include: { owner: true, firstContact: true },
     orderBy: { updatedAt: "desc" },
   });
 
@@ -140,6 +140,7 @@ export default async function LeadsPage({
                 </Link>
               </th>
               <th className="px-4 py-3">Est. Value</th>
+              <th className="px-4 py-3">First Contact</th>
               <th className="px-4 py-3">Owner</th>
               <th className="px-4 py-3">Next Action</th>
             </tr>
@@ -169,6 +170,9 @@ export default async function LeadsPage({
                 <td className="px-4 py-3 text-foreground/70">
                   {lead.estValue ? `$${lead.estValue.toLocaleString()}` : "—"}
                 </td>
+                <td className="px-4 py-3 text-foreground/70">
+                  {lead.firstContact?.name ?? "Unassigned"}
+                </td>
                 <td className="px-4 py-3 text-foreground/70">{lead.owner?.name ?? "Unassigned"}</td>
                 <td className="px-4 py-3 text-foreground/70">
                   {lead.nextAction ? (
@@ -188,7 +192,7 @@ export default async function LeadsPage({
             ))}
             {leads.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-sm text-foreground/50">
+                <td colSpan={8} className="px-4 py-10 text-center text-sm text-foreground/50">
                   No leads match these filters.
                 </td>
               </tr>

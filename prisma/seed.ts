@@ -264,6 +264,7 @@ async function main() {
         stage: lead.stage,
         estValue: lead.estValue,
         ownerId: userIdByEmail.get(lead.ownerEmail),
+        firstContactId: userIdByEmail.get(lead.ownerEmail),
         dateFirstContacted: daysFromNow(-lead.daysAgoContacted),
         lastContactDate: daysFromNow(-lead.daysAgoLastContact),
         nextAction: lead.nextAction,

@@ -19,6 +19,7 @@ const leadSchema = z.object({
   stage: z.nativeEnum(PipelineStage),
   estValue: z.string().optional(),
   ownerId: z.string().optional(),
+  firstContactId: z.string().optional(),
   dateFirstContacted: z.string().optional(),
   lastContactDate: z.string().optional(),
   nextAction: z.string().trim().optional(),
@@ -76,6 +77,7 @@ export async function createLeadAction(_prevState: string | undefined, formData:
       stage: data.stage,
       estValue: toFloat(data.estValue),
       ownerId: data.ownerId || null,
+      firstContactId: data.firstContactId || null,
       dateFirstContacted: toDate(data.dateFirstContacted),
       lastContactDate: toDate(data.lastContactDate),
       nextAction: data.nextAction || null,
@@ -113,7 +115,12 @@ export async function updateLeadAction(
 
   const existing = await prisma.lead.findUnique({ where: { id: leadId } });
 
-  const ownerIds = [existing?.ownerId, data.ownerId].filter((id): id is string => !!id);
+  const ownerIds = [
+    existing?.ownerId,
+    data.ownerId,
+    existing?.firstContactId,
+    data.firstContactId,
+  ].filter((id): id is string => !!id);
   const owners = ownerIds.length
     ? await prisma.user.findMany({ where: { id: { in: ownerIds } } })
     : [];
@@ -135,6 +142,7 @@ export async function updateLeadAction(
       stage: data.stage,
       estValue: toFloat(data.estValue),
       ownerId: data.ownerId || null,
+      firstContactId: data.firstContactId || null,
       dateFirstContacted: toDate(data.dateFirstContacted),
       lastContactDate: toDate(data.lastContactDate),
       nextAction: newNextAction,
@@ -157,6 +165,11 @@ export async function updateLeadAction(
       {
         key: "ownerId",
         label: "Owner",
+        format: (id) => (id ? (ownerNameById.get(id as string) ?? "Unknown") : "Unassigned"),
+      },
+      {
+        key: "firstContactId",
+        label: "First Contact",
         format: (id) => (id ? (ownerNameById.get(id as string) ?? "Unknown") : "Unassigned"),
       },
       { key: "nextAction", label: "Next Action" },

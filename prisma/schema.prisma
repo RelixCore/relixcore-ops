@@ -75,6 +75,7 @@ model User {
 
   secondaryRoles         UserRole[]
   ownedLeads             Lead[]                 @relation("LeadOwner")
+  firstContactLeads      Lead[]                 @relation("LeadFirstContact")
   checklistEntries       ChecklistEntry[]
   activityLogs           ActivityLog[]
   assignedChecklistTasks CustomChecklistTask[]  @relation("ChecklistTaskAssignee")
@@ -106,6 +107,8 @@ model Lead {
   estValue            Float?
   ownerId             String?
   owner               User?         @relation("LeadOwner", fields: [ownerId], references: [id])
+  firstContactId      String?
+  firstContact        User?         @relation("LeadFirstContact", fields: [firstContactId], references: [id])
   dateFirstContacted  DateTime?
   lastContactDate     DateTime?
   nextAction          String?

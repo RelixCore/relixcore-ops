@@ -20,6 +20,7 @@ type LeadDefaults = {
   stage?: string;
   estValue?: number | null;
   ownerId?: string | null;
+  firstContactId?: string | null;
   dateFirstContacted?: string;
   lastContactDate?: string;
   nextAction?: string;
@@ -118,7 +119,16 @@ export default function LeadForm({
             ))}
           </select>
         </Field>
-        <div />
+        <Field label="First Contact">
+          <select name="firstContactId" defaultValue={defaults?.firstContactId ?? ""} className="input">
+            <option value="">Unassigned</option>
+            {owners.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+        </Field>
 
         <Field label="Date First Contacted">
           <input

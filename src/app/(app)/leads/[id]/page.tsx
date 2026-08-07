@@ -14,7 +14,7 @@ export default async function EditLeadPage({
 }) {
   const { id } = await params;
   const [lead, user] = await Promise.all([
-    prisma.lead.findUnique({ where: { id }, include: { owner: true } }),
+    prisma.lead.findUnique({ where: { id }, include: { owner: true, firstContact: true } }),
     getCurrentUser(),
   ]);
 
@@ -39,6 +39,7 @@ export default async function EditLeadPage({
             label="Est. Value"
             value={lead.estValue ? `$${lead.estValue.toLocaleString()}` : "—"}
           />
+          <DetailField label="First Contact" value={lead.firstContact?.name ?? "Unassigned"} />
           <DetailField label="Owner" value={lead.owner?.name ?? "Unassigned"} />
           <DetailField label="Next Action" value={lead.nextAction ?? "—"} />
           <DetailField
@@ -98,6 +99,7 @@ export default async function EditLeadPage({
             stage: lead.stage,
             estValue: lead.estValue,
             ownerId: lead.ownerId,
+            firstContactId: lead.firstContactId,
             dateFirstContacted: lead.dateFirstContacted?.toISOString(),
             lastContactDate: lead.lastContactDate?.toISOString(),
             nextAction: lead.nextAction ?? undefined,
