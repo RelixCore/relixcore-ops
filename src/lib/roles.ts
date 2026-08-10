@@ -47,8 +47,9 @@ function toList(roles: Role | Role[]): Role[] {
   return Array.isArray(roles) ? roles : [roles];
 }
 
-export function canEditCrm(roles: Role | Role[]) {
-  return toList(roles).some((r) => CRM_EDIT_ROLES.includes(r));
+export function canEditCrm(user: { roles: Role | Role[]; crmAccessOverride?: boolean }) {
+  if (user.crmAccessOverride) return true;
+  return toList(user.roles).some((r) => CRM_EDIT_ROLES.includes(r));
 }
 
 export function canViewDashboard(roles: Role | Role[]) {

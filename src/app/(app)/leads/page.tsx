@@ -12,7 +12,7 @@ export default async function LeadsPage({
 }) {
   const params = await searchParams;
   const user = await getCurrentUser();
-  const canEdit = user ? canEditCrm(user.roles) : false;
+  const canEdit = user ? canEditCrm(user) : false;
 
   const stageFilter = typeof params.stage === "string" ? params.stage : undefined;
   const channelFilter = typeof params.channel === "string" ? params.channel : undefined;

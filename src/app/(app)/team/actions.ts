@@ -34,6 +34,13 @@ function parseSecondaryRoles(formData: FormData, primary: Role): Role[] {
   return [...new Set(selected.filter((v) => roleValues.includes(v) && v !== primary))] as Role[];
 }
 
+// Only an Admin may grant/revoke CRM access independent of role — a Growth
+// Lead can manage the team but shouldn't be able to hand out CRM edit rights.
+function parseCrmAccessOverride(formData: FormData, actor: { roles: Role[] }): boolean | undefined {
+  if (!actor.roles.includes("ADMIN")) return undefined;
+  return formData.get("crmAccessOverride") === "on";
+}
+
 export async function createUserAction(_prevState: string | undefined, formData: FormData) {
   const actor = await requireTeamManager();
 
@@ -51,6 +58,7 @@ export async function createUserAction(_prevState: string | undefined, formData:
   }
 
   const secondaryRoles = parseSecondaryRoles(formData, data.role);
+  const crmAccessOverride = parseCrmAccessOverride(formData, actor);
   const passwordHash = await bcrypt.hash(data.password, 10);
 
   const created = await prisma.user.create({
@@ -61,6 +69,7 @@ export async function createUserAction(_prevState: string | undefined, formData:
       role: data.role,
       avatarUrl: data.avatarUrl || null,
       passwordHash,
+      ...(crmAccessOverride !== undefined ? { crmAccessOverride } : {}),
       secondaryRoles: { create: secondaryRoles.map((role) => ({ role })) },
     },
   });
@@ -105,6 +114,7 @@ export async function updateUserAction(
   });
 
   const secondaryRoles = parseSecondaryRoles(formData, data.role);
+  const crmAccessOverride = parseCrmAccessOverride(formData, actor);
   const passwordHash = data.password ? await bcrypt.hash(data.password, 10) : undefined;
 
   await prisma.user.update({
@@ -116,6 +126,7 @@ export async function updateUserAction(
       role: data.role,
       avatarUrl: data.avatarUrl || null,
       ...(passwordHash ? { passwordHash } : {}),
+      ...(crmAccessOverride !== undefined ? { crmAccessOverride } : {}),
       secondaryRoles: {
         deleteMany: {},
         create: secondaryRoles.map((role) => ({ role })),
@@ -129,13 +140,22 @@ export async function updateUserAction(
 
     const diffs = diffFields(
       { ...before, secondaryRolesLabel: beforeSecondary },
-      { ...before, name: data.name, email: data.email, title: data.title || null, role: data.role, secondaryRolesLabel: afterSecondary },
+      {
+        ...before,
+        name: data.name,
+        email: data.email,
+        title: data.title || null,
+        role: data.role,
+        secondaryRolesLabel: afterSecondary,
+        crmAccessOverride: crmAccessOverride ?? before.crmAccessOverride,
+      },
       [
         { key: "name", label: "Name" },
         { key: "email", label: "Email" },
         { key: "title", label: "Title" },
         { key: "role", label: "Primary Role", format: (v) => ROLE_LABELS[v as Role] },
         { key: "secondaryRolesLabel", label: "Secondary Roles" },
+        { key: "crmAccessOverride", label: "CRM Access Override", format: (v) => (v ? "Granted" : "Revoked") },
       ]
     );
     if (data.password) {

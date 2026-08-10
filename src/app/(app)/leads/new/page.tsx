@@ -7,7 +7,7 @@ import { createLeadAction } from "../actions";
 
 export default async function NewLeadPage() {
   const user = await getCurrentUser();
-  if (!user || !canEditCrm(user.roles)) {
+  if (!user || !canEditCrm(user)) {
     redirect("/leads");
   }
 

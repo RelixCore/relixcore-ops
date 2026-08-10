@@ -2,7 +2,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { ROLE_LABELS, ROLE_SUBTITLES, canManageTeam } from "@/lib/roles";
+import { ROLE_LABELS, ROLE_SUBTITLES, canEditCrm, canManageTeam } from "@/lib/roles";
 import UserForm from "@/components/UserForm";
 import { deleteUserAction, updateUserAction } from "../actions";
 
@@ -20,6 +20,7 @@ export default async function TeamMemberPage({
   if (!member) notFound();
 
   const canManage = currentUser ? canManageTeam(currentUser.roles) : false;
+  const isAdmin = currentUser ? currentUser.roles.includes("ADMIN") : false;
 
   if (!canManage) {
     return (
@@ -53,6 +54,17 @@ export default async function TeamMemberPage({
               value={member.secondaryRoles.map((r) => ROLE_LABELS[r.role]).join(", ")}
             />
           ) : null}
+          <DetailField
+            label="CRM Access"
+            value={
+              canEditCrm({
+                roles: [member.role, ...member.secondaryRoles.map((r) => r.role)],
+                crmAccessOverride: member.crmAccessOverride,
+              })
+                ? "Can edit"
+                : "Read-only"
+            }
+          />
         </div>
       </div>
     );
@@ -71,6 +83,7 @@ export default async function TeamMemberPage({
           submitLabel="Save Changes"
           deleteAction={deleteUserAction}
           userId={member.id}
+          isAdmin={isAdmin}
           defaults={{
             name: member.name,
             email: member.email,
@@ -78,6 +91,7 @@ export default async function TeamMemberPage({
             role: member.role,
             secondaryRoles: member.secondaryRoles.map((r) => r.role),
             avatarUrl: member.avatarUrl ?? undefined,
+            crmAccessOverride: member.crmAccessOverride,
           }}
         />
       </div>

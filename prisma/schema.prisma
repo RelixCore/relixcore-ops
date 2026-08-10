@@ -73,6 +73,11 @@ model User {
   avatarUrl    String?
   createdAt    DateTime @default(now())
 
+  // Admin-granted CRM edit access independent of role (Role.CRM_EDIT_ROLES
+  // already grants this to Platform Owners/Growth Lead/Admin; this override
+  // lets an Admin extend edit access to any other member individually).
+  crmAccessOverride Boolean @default(false)
+
   secondaryRoles         UserRole[]
   ownedLeads             Lead[]                 @relation("LeadOwner")
   firstContactLeads      Lead[]                 @relation("LeadFirstContact")

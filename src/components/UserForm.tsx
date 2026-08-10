@@ -13,6 +13,7 @@ type UserDefaults = {
   role?: Role;
   secondaryRoles?: Role[];
   avatarUrl?: string;
+  crmAccessOverride?: boolean;
 };
 
 export default function UserForm({
@@ -22,6 +23,7 @@ export default function UserForm({
   submitLabel,
   deleteAction,
   userId,
+  isAdmin,
 }: {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   mode: "create" | "edit";
@@ -29,6 +31,7 @@ export default function UserForm({
   submitLabel: string;
   deleteAction?: (formData: FormData) => Promise<void>;
   userId?: string;
+  isAdmin?: boolean;
 }) {
   const [error, formAction, pending] = useActionState(action, undefined);
   const secondaryDefaults = new Set(defaults?.secondaryRoles ?? []);
@@ -109,6 +112,23 @@ export default function UserForm({
           ))}
         </div>
       </fieldset>
+
+      {isAdmin ? (
+        <fieldset>
+          <legend className="mb-2 text-sm font-medium text-brand-teal-dark">
+            CRM Access <span className="font-normal text-foreground/50">(Admin only)</span>
+          </legend>
+          <label className="flex items-center gap-2 rounded-lg border border-border p-4 text-sm text-foreground/80">
+            <input
+              type="checkbox"
+              name="crmAccessOverride"
+              defaultChecked={defaults?.crmAccessOverride ?? false}
+              className="h-4 w-4 accent-brand-red"
+            />
+            Grant CRM edit access, independent of role
+          </label>
+        </fieldset>
+      ) : null}
 
       {error ? (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-brand-red-dark">{error}</p>

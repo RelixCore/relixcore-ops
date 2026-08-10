@@ -20,7 +20,7 @@ export default async function EditLeadPage({
 
   if (!lead) notFound();
 
-  const canEdit = user ? canEditCrm(user.roles) : false;
+  const canEdit = user ? canEditCrm(user) : false;
   const isManager = user ? canViewDashboard(user.roles) : false;
   const isOwner = user ? lead.ownerId === user.id : false;
   const canMarkDone = Boolean(lead.nextAction && !lead.nextActionDone && (isManager || isOwner));

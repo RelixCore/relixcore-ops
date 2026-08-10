@@ -41,7 +41,7 @@ function toFloat(value?: string) {
 
 async function requireCrmEditor() {
   const user = await getCurrentUser();
-  if (!user || !canEditCrm(user.roles)) {
+  if (!user || !canEditCrm(user)) {
     throw new Error("Not authorized to edit the Lead Tracker.");
   }
   return user;

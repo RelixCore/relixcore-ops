@@ -14,7 +14,12 @@ export default async function NewTeamMemberPage() {
     <div>
       <h1 className="mb-6 text-2xl font-semibold text-brand-teal-dark">Add Team Member</h1>
       <div className="rounded-xl border border-border bg-card p-6">
-        <UserForm action={createUserAction} mode="create" submitLabel="Add Team Member" />
+        <UserForm
+          action={createUserAction}
+          mode="create"
+          submitLabel="Add Team Member"
+          isAdmin={user.roles.includes("ADMIN")}
+        />
       </div>
     </div>
   );
