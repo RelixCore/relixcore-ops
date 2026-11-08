@@ -129,7 +129,7 @@ model Lead {
 model ChecklistEntry {
   id        String   @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   date      String   // YYYY-MM-DD, local calendar day the checklist belongs to
   itemKey   String
   completed Boolean  @default(false)
