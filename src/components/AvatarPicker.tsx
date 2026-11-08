@@ -1,62 +1,70 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
-import { ANIMALS, AVATARS, isCollectionAvatar } from "@/lib/avatars";
+import { AVATARS } from "@/lib/avatars";
 
 export default function AvatarPicker({ current = "", taken = [], disabled = false }: {
   current?: string; taken?: string[]; disabled?: boolean;
 }) {
-  const id = useId();
+  const dialog = useRef<HTMLDialogElement>(null);
   const [selected, setSelected] = useState(current);
-  const [style, setStyle] = useState("All");
-  const [animal, setAnimal] = useState("All");
+  const [warning, setWarning] = useState("");
   const unavailable = new Set(taken);
-  const chosen = AVATARS.find((avatar) => avatar.url === selected);
-  const visible = AVATARS.filter((avatar) => (style === "All" || avatar.style === style) && (animal === "All" || avatar.animal === animal));
+
+  function choose(url: string) {
+    if (disabled) return;
+    if (unavailable.has(url)) {
+      setWarning("This avatar is already in use. Please choose another.");
+      return;
+    }
+    setSelected(url);
+    setWarning("");
+    dialog.current?.close();
+  }
 
   return (
-    <fieldset disabled={disabled} className="min-w-0 rounded-xl border border-border overflow-hidden">
-      <legend className="ml-4 px-2 text-sm font-semibold text-brand-teal-dark">Choose a character</legend>
+    <div>
       <input type="hidden" name="avatarUrl" value={selected} />
-      <div className="flex items-center gap-4 bg-[#192a2c] p-5 text-[#f4e5c9]">
-        {selected ? <Image unoptimized src={selected} alt={chosen?.name ?? "Current avatar"} width={88} height={88} className="rounded-full" /> : <span className="flex h-[88px] w-[88px] shrink-0 items-center justify-center rounded-full border border-white/20 text-3xl">?</span>}
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[.22em] text-[#d7b574]">The Relix Family · 60 characters</p>
-          <p className="mt-1 text-lg font-semibold">{chosen?.name ?? (selected ? "Current photo" : "Find your alter ego")}</p>
-          <p className="mt-1 text-xs text-white/70">One character. One member. Yours when you save.</p>
-        </div>
+      <div className="relative w-fit">
+        {selected ? (
+          <Image unoptimized src={selected} alt="Selected avatar" width={72} height={72} className="rounded-full" />
+        ) : (
+          <span className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-brand-teal-dark text-white" aria-label="Default avatar">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 22v-2a8 8 0 0 1 16 0v2" /></svg>
+          </span>
+        )}
+        <button type="button" disabled={disabled} aria-label="Edit avatar"
+          onClick={() => { setWarning(""); dialog.current?.showModal(); }}
+          className="absolute -bottom-1 -right-3 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium shadow-sm hover:bg-zinc-100 focus-visible:outline-2 disabled:opacity-50">
+          Edit
+        </button>
       </div>
-      <div className="flex flex-wrap items-end gap-3 p-4">
-        <div className="flex flex-col gap-1 text-xs font-medium">
-          <label htmlFor={`${id}-style`}>Style</label>
-          <select id={`${id}-style`} value={style} onChange={(e) => setStyle(e.target.value)} className="input">
-            {["All", "Masculine", "Feminine"].map((value) => <option key={value}>{value}</option>)}
-          </select>
+      <dialog ref={dialog} aria-label="Choose an avatar"
+        className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md max-h-[75dvh] overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-xl backdrop:bg-black/40"
+        onClose={() => setWarning("")}
+        onClick={(event) => {
+          if (event.target !== event.currentTarget) return;
+          const bounds = event.currentTarget.getBoundingClientRect();
+          if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) event.currentTarget.close();
+        }}>
+        <div className="mb-2 flex justify-end">
+          <button type="button" autoFocus aria-label="Close avatar picker" onClick={() => dialog.current?.close()}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-foreground/60 hover:bg-zinc-100 focus-visible:outline-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+          </button>
         </div>
-        <div className="flex flex-col gap-1 text-xs font-medium">
-          <label htmlFor={`${id}-animal`}>Animal</label>
-          <select id={`${id}-animal`} value={animal} onChange={(e) => setAnimal(e.target.value)} className="input">
-            {["All", ...ANIMALS].map((value) => <option key={value}>{value}</option>)}
-          </select>
+        {warning ? <p role="alert" className="sticky top-0 z-10 mb-3 rounded-lg bg-red-50 p-3 text-sm text-brand-red-dark">{warning}</p> : null}
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+          {AVATARS.map((avatar) => (
+            <button key={avatar.id} type="button" disabled={disabled} aria-label={avatar.name} aria-pressed={selected === avatar.url}
+              onClick={() => choose(avatar.url)}
+              className={`rounded-full border-2 p-0.5 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal-dark ${selected === avatar.url ? "border-brand-red" : "border-transparent hover:border-brand-red/40"}`}>
+              <Image unoptimized src={avatar.url} alt="" width={72} height={72} className="h-auto w-full rounded-full" />
+            </button>
+          ))}
         </div>
-        <button type="button" onClick={() => setSelected("")} className="rounded border border-border px-3 py-2 text-xs focus-visible:outline-2">Use initials</button>
-        {current && !isCollectionAvatar(current) ? <button type="button" onClick={() => setSelected(current)} className="rounded border border-border px-3 py-2 text-xs">Keep current photo</button> : null}
-      </div>
-      <p className="px-4 pb-3 text-xs text-foreground/60" aria-live="polite">{visible.filter((avatar) => !unavailable.has(avatar.url)).length} available in this view · Taken characters are locked.</p>
-      <div className="grid max-h-[480px] grid-cols-2 gap-2 overflow-y-auto px-4 pb-4 sm:grid-cols-4 lg:grid-cols-5" role="group" aria-label="Animal characters">
-        {visible.map((avatar) => {
-          const locked = unavailable.has(avatar.url);
-          const active = selected === avatar.url;
-          return <button key={avatar.id} type="button" disabled={locked} aria-pressed={active} aria-label={`${avatar.name}${locked ? ", taken" : ""}`} onClick={() => setSelected(avatar.url)}
-            className={`relative flex flex-col items-center rounded-xl border-2 p-2 text-center transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-teal-dark ${active ? "border-[#ad8548] bg-[#f6f0e5]" : "border-transparent bg-zinc-50 hover:border-[#d7b574]"} ${locked ? "opacity-45 cursor-not-allowed" : ""}`}>
-            <Image unoptimized src={avatar.url} alt="" width={104} height={104} className="h-auto w-full max-w-[104px]" />
-            <span className="mt-2 text-xs font-semibold">{avatar.animal}</span>
-            <span className="text-[11px] text-foreground/60">{avatar.name.split(" · ")[1]}</span>
-            <span className={`mt-1 text-[10px] font-semibold uppercase tracking-wide ${active ? "text-brand-teal-dark" : "text-foreground/50"}`}>{locked ? "Taken" : active ? "Selected" : "Available"}</span>
-          </button>;
-        })}
-      </div>
-    </fieldset>
+      </dialog>
+    </div>
   );
 }
