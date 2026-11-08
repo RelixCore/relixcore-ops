@@ -4,7 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { ROLE_LABELS, ROLE_SUBTITLES, canEditCrm, canManageTeam } from "@/lib/roles";
 import UserForm from "@/components/UserForm";
-import { deleteUserAction, updateUserAction } from "../actions";
+import { deleteUserAction, updateUserAction, updateMyAvatarAction } from "../actions";
+import AvatarForm from "@/components/AvatarForm";
+import { takenAvatars } from "@/lib/avatar-claims";
 
 export default async function TeamMemberPage({
   params,
@@ -21,6 +23,8 @@ export default async function TeamMemberPage({
 
   const canManage = currentUser ? canManageTeam(currentUser.roles) : false;
   const isAdmin = currentUser ? currentUser.roles.includes("ADMIN") : false;
+  const canChooseAvatar = canManage || currentUser?.id === member.id;
+  const taken = canChooseAvatar ? await takenAvatars(member.id) : [];
 
   if (!canManage) {
     return (
@@ -66,6 +70,7 @@ export default async function TeamMemberPage({
             }
           />
         </div>
+        {currentUser?.id === member.id ? <AvatarForm action={updateMyAvatarAction} current={member.avatarUrl ?? ""} taken={taken} /> : null}
       </div>
     );
   }
@@ -84,6 +89,7 @@ export default async function TeamMemberPage({
           deleteAction={deleteUserAction}
           userId={member.id}
           isAdmin={isAdmin}
+          takenAvatars={taken}
           defaults={{
             name: member.name,
             email: member.email,

@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Role } from "@prisma/client";
 import { ROLE_LABELS } from "@/lib/roles";
 import ConfirmButton from "./ConfirmButton";
+import AvatarPicker from "./AvatarPicker";
 
 type UserDefaults = {
   name?: string;
@@ -24,6 +25,7 @@ export default function UserForm({
   deleteAction,
   userId,
   isAdmin,
+  takenAvatars = [],
 }: {
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   mode: "create" | "edit";
@@ -32,6 +34,7 @@ export default function UserForm({
   deleteAction?: (formData: FormData) => Promise<void>;
   userId?: string;
   isAdmin?: boolean;
+  takenAvatars?: string[];
 }) {
   const [error, formAction, pending] = useActionState(action, undefined);
   const secondaryDefaults = new Set(defaults?.secondaryRoles ?? []);
@@ -61,14 +64,6 @@ export default function UserForm({
             className="input"
           />
         </Field>
-        <Field label="Avatar Path">
-          <input
-            name="avatarUrl"
-            defaultValue={defaults?.avatarUrl}
-            placeholder="/images/headshot-1.jpg (optional)"
-            className="input"
-          />
-        </Field>
 
         <Field label="Primary Role" required>
           <select name="role" required defaultValue={defaults?.role ?? ""} className="input">
@@ -92,6 +87,8 @@ export default function UserForm({
           />
         </Field>
       </div>
+
+      <AvatarPicker current={defaults?.avatarUrl} taken={takenAvatars} disabled={pending} />
 
       <fieldset>
         <legend className="mb-2 text-sm font-medium text-brand-teal-dark">

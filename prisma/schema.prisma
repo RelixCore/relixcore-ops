@@ -70,6 +70,8 @@ model User {
   passwordHash String
   role         Role
   title        String?
+  // Collection URLs have a partial unique index (see exclusive_animal_avatars
+  // migration). Prisma cannot express partial indexes; preserve it in migrations.
   avatarUrl    String?
   createdAt    DateTime @default(now())
 

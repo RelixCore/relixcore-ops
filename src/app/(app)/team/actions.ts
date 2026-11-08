@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { canManageTeam, ROLE_LABELS } from "@/lib/roles";
 import { logActivity, diffFields } from "@/lib/activityLog";
+import { avatarSaveError, validAvatarChoice } from "@/lib/avatar-claims";
 
 const emptyToUndefined = (val: unknown) => (val === "" ? undefined : val);
 
@@ -52,6 +53,8 @@ export async function createUserAction(_prevState: string | undefined, formData:
   }
   const data = parsed.data;
 
+  if (!validAvatarChoice(data.avatarUrl ?? "")) return "Choose an avatar from the collection.";
+
   const existing = await prisma.user.findUnique({ where: { email: data.email } });
   if (existing) {
     return "A team member with that email already exists.";
@@ -61,18 +64,25 @@ export async function createUserAction(_prevState: string | undefined, formData:
   const crmAccessOverride = parseCrmAccessOverride(formData, actor);
   const passwordHash = await bcrypt.hash(data.password, 10);
 
-  const created = await prisma.user.create({
-    data: {
-      name: data.name,
-      email: data.email,
-      title: data.title || null,
-      role: data.role,
-      avatarUrl: data.avatarUrl || null,
-      passwordHash,
-      ...(crmAccessOverride !== undefined ? { crmAccessOverride } : {}),
-      secondaryRoles: { create: secondaryRoles.map((role) => ({ role })) },
-    },
-  });
+  let created;
+  try {
+    created = await prisma.user.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        title: data.title || null,
+        role: data.role,
+        avatarUrl: data.avatarUrl || null,
+        passwordHash,
+        ...(crmAccessOverride !== undefined ? { crmAccessOverride } : {}),
+        secondaryRoles: { create: secondaryRoles.map((role) => ({ role })) },
+      },
+    });
+  } catch (error) {
+    const message = avatarSaveError(error);
+    if (message) return message;
+    throw error;
+  }
 
   await logActivity({
     actorId: actor.id,
@@ -113,26 +123,35 @@ export async function updateUserAction(
     include: { secondaryRoles: true },
   });
 
+  if (!before) return "This team member no longer exists.";
+  if (!validAvatarChoice(data.avatarUrl ?? "", before.avatarUrl)) return "Choose an avatar from the collection.";
+
   const secondaryRoles = parseSecondaryRoles(formData, data.role);
   const crmAccessOverride = parseCrmAccessOverride(formData, actor);
   const passwordHash = data.password ? await bcrypt.hash(data.password, 10) : undefined;
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      name: data.name,
-      email: data.email,
-      title: data.title || null,
-      role: data.role,
-      avatarUrl: data.avatarUrl || null,
-      ...(passwordHash ? { passwordHash } : {}),
-      ...(crmAccessOverride !== undefined ? { crmAccessOverride } : {}),
-      secondaryRoles: {
-        deleteMany: {},
-        create: secondaryRoles.map((role) => ({ role })),
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: data.name,
+        email: data.email,
+        title: data.title || null,
+        role: data.role,
+        avatarUrl: data.avatarUrl || null,
+        ...(passwordHash ? { passwordHash } : {}),
+        ...(crmAccessOverride !== undefined ? { crmAccessOverride } : {}),
+        secondaryRoles: {
+          deleteMany: {},
+          create: secondaryRoles.map((role) => ({ role })),
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    const message = avatarSaveError(error);
+    if (message) return message;
+    throw error;
+  }
 
   if (before) {
     const beforeSecondary = before.secondaryRoles.map((r) => r.role).sort().join(", ");
@@ -146,11 +165,13 @@ export async function updateUserAction(
         email: data.email,
         title: data.title || null,
         role: data.role,
+        avatarUrl: data.avatarUrl || null,
         secondaryRolesLabel: afterSecondary,
         crmAccessOverride: crmAccessOverride ?? before.crmAccessOverride,
       },
       [
         { key: "name", label: "Name" },
+        { key: "avatarUrl", label: "Avatar" },
         { key: "email", label: "Email" },
         { key: "title", label: "Title" },
         { key: "role", label: "Primary Role", format: (v) => ROLE_LABELS[v as Role] },
@@ -175,9 +196,31 @@ export async function updateUserAction(
     }
   }
 
-  revalidatePath("/team");
+  revalidatePath("/", "layout");
   revalidatePath("/dashboard");
   redirect("/team");
+}
+
+export async function updateMyAvatarAction(_previous: string | undefined, formData: FormData) {
+  const actor = await getCurrentUser();
+  if (!actor) return "Sign in to choose your avatar.";
+  const avatarUrl = String(formData.get("avatarUrl") ?? "");
+  if (!validAvatarChoice(avatarUrl, actor.avatarUrl)) return "Choose an avatar from the collection.";
+  try {
+    // The database unique index is authoritative, including concurrent claims.
+    await prisma.user.update({ where: { id: actor.id }, data: { avatarUrl: avatarUrl || null } });
+  } catch (error) {
+    const message = avatarSaveError(error);
+    if (message) return message;
+    throw error;
+  }
+  if ((actor.avatarUrl ?? "") !== avatarUrl) {
+    await logActivity({ actorId: actor.id, actorName: actor.name, action: "TEAM_MEMBER_UPDATED",
+      entityType: "User", entityId: actor.id, entityLabel: actor.name,
+      details: [{ field: "Avatar", from: actor.avatarUrl ?? "Initials", to: avatarUrl || "Initials" }] });
+  }
+  revalidatePath("/", "layout");
+  return "Avatar saved.";
 }
 
 export async function deleteUserAction(formData: FormData) {
