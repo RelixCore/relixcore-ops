@@ -75,6 +75,11 @@ model User {
   avatarUrl    String?
   createdAt    DateTime @default(now())
 
+  chatMemberships ChatMember[]
+  chatMessages ChatMessage[]
+  createdChatRooms ChatRoom[]
+  driveConnection DriveConnection?
+
   // Admin-granted CRM edit access independent of role (Role.CRM_EDIT_ROLES
   // already grants this to Platform Owners/Growth Lead/Admin; this override
   // lets an Admin extend edit access to any other member individually).
@@ -236,4 +241,71 @@ model ActivityLog {
   @@index([actorId])
   @@index([createdAt])
   @@index([action])
+}
+
+model ChatRoom {
+  id String @id @default(cuid())
+  name String
+  isGeneral Boolean @default(false)
+  ownerId String?
+  owner User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  members ChatMember[]
+  messages ChatMessage[]
+  driveWatches DriveWatch[]
+}
+
+model ChatMember {
+  roomId String
+  userId String
+  room ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadSeq Int @default(0)
+  @@id([roomId, userId])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id String @id @default(cuid())
+  seq Int @unique @default(autoincrement())
+  roomId String
+  room ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  authorId String?
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorName String
+  body String
+  driveUrl String?
+  mentionIds String[] @default([])
+  replyToId String?
+  replyTo ChatMessage? @relation("ChatReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies ChatMessage[] @relation("ChatReplies")
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([roomId, seq])
+}
+
+model DriveConnection {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email String
+  refreshToken String
+  watches DriveWatch[]
+}
+
+model DriveWatch {
+  id String @id @default(cuid())
+  connectionId String
+  connection DriveConnection @relation(fields: [connectionId], references: [userId], onDelete: Cascade)
+  roomId String
+  room ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  folderId String
+  folderName String
+  includeSubfolders Boolean @default(false)
+  snapshot Json?
+  lastCheckedAt DateTime?
+  lastAttemptAt DateTime @default(now())
+  lastError String?
+  leaseUntil DateTime?
+  leaseToken String?
+  @@unique([connectionId, roomId, folderId])
 }

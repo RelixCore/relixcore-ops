@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import ChatUnreadBadge from "./ChatUnreadBadge";
 import { logoutAction } from "@/app/actions";
 import NextActionBell, { type NextActionBellItem } from "@/components/NextActionBell";
 
@@ -100,6 +101,7 @@ export default function Sidebar({
                 }`}
               >
                 {item.label}
+                {item.href === "/chat" ? <ChatUnreadBadge /> : null}
               </Link>
             );
           })}

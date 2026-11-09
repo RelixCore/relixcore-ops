@@ -17,6 +17,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/leads", label: "Lead Tracker (CRM)" },
     { href: "/checklist", label: "Daily Checklist" },
     { href: "/team", label: "Team" },
+    { href: "/chat", label: "Team Chat" },
+    ...(user.roles.includes("ADMIN") ? [{ href: "/integrations", label: "Integrations" }] : []),
     { href: `/team/${user.id}`, label: "My Profile" },
     ...(canManageTeam(user.roles) ? [{ href: "/activity", label: "Activity Log" }] : []),
   ];
