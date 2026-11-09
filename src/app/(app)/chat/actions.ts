@@ -6,6 +6,18 @@ import { getRoom } from "@/lib/chat";
 import { messageInput } from "@/lib/chat-validation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { createHash } from "node:crypto";
+
+export async function openDirectMessage(memberId: string) {
+  const user = await getCurrentUser();
+  if (!user || typeof memberId !== "string" || memberId.length > 100 || memberId === user.id) return { error: "Choose another team member." };
+  const member = await prisma.user.findUnique({ where: { id: memberId }, select: { id: true } });
+  if (!member) return { error: "That team member is no longer available." };
+  const id = `dm_${createHash("sha256").update(JSON.stringify([user.id, memberId].sort())).digest("hex")}`;
+  await prisma.chatRoom.upsert({ where: { id }, update: {}, create: { id, name: "Direct message", members: { create: [{ userId: user.id }, { userId: memberId }] } } });
+  if (!await getRoom(id, user.id)) return { error: "This conversation is unavailable." };
+  return { roomId: id };
+}
 
 export async function sendMessage(input: unknown) {
   const user = await getCurrentUser();
@@ -41,7 +53,7 @@ export async function changeGroupMember(roomId: string, memberId: string, add: b
   const user = await getCurrentUser();
   if (!user) return { error: "Sign in to manage members." };
   const room = await getRoom(roomId, user.id);
-  if (!room || room.isGeneral || (room.ownerId !== user.id && !user.roles.includes("ADMIN"))) return { error: "Only the group creator or an administrator in this group can manage its members." };
+  if (!room || room.isGeneral || room.id.startsWith("dm_") || (room.ownerId !== user.id && !user.roles.includes("ADMIN"))) return { error: "Only the group creator or an administrator in this group can manage its members." };
   if (!add && (memberId === room.ownerId || memberId === user.id)) return { error: "You cannot remove yourself or the group creator." };
   if (add) {
     if (!await prisma.user.findUnique({ where: { id: memberId }, select: { id: true } })) return { error: "Member no longer exists." };
