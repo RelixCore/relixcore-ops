@@ -14,6 +14,7 @@ await build({stdin:{contents:`export * from './src/app/(app)/chat/actions';expor
 const api=require(output),db=api.prisma;const actors={};for(const id of ['admin','member','outsider'])actors[id]={...(await db.user.findUnique({where:{id}})),roles:[id==='admin'?'ADMIN':'JUNIOR_EDITOR']};
 const as=id=>globalThis.__testActor=actors[id]??null;const send=(roomId,body,extra={})=>api.sendMessage({roomId,body,driveUrl:'',mentionIds:[],replyToId:null,...extra});
 try {
+as('admin');const dm=await api.openDirectMessage('member');assert(dm.roomId);as('member');assert.equal((await api.openDirectMessage('admin')).roomId,dm.roomId);as('outsider');assert.equal(await api.roomSnapshot(dm.roomId,'outsider'),null);as('admin');assert((await api.changeGroupMember(dm.roomId,'outsider',true)).error);
 as('admin');const group=await api.createGroup({name:'Private test',memberIds:['member']});assert(group.roomId);const id=group.roomId;
 as('outsider');assert.equal(await api.roomSnapshot(id,'outsider'),null);assert((await send(id,'Not allowed')).error);assert((await api.changeGroupMember(id,'outsider',true)).error);
 as('admin');assert((await send(id,'Hello',{mentionIds:['outsider']})).error);assert((await send(id,'Hello',{driveUrl:'https://evil.invalid/file'})).error);

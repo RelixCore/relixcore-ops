@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { roomList, roomSnapshot } from "@/lib/chat";
-import { changeGroupMember, createGroup, markChatRead, removeMessage, sendMessage } from "@/app/(app)/chat/actions";
+import { changeGroupMember, createGroup, openDirectMessage, markChatRead, removeMessage, sendMessage } from "@/app/(app)/chat/actions";
 
 type Rooms = Awaited<ReturnType<typeof roomList>>;
 type Snapshot = NonNullable<Awaited<ReturnType<typeof roomSnapshot>>>;
@@ -26,9 +26,10 @@ export default function ChatWorkspace({ initialRooms, initialSnapshot, people, u
   const [groupName, setGroupName] = useState("");
   const [groupMembers, setGroupMembers] = useState<string[]>([]);
   const [showCreate, setShowCreate] = useState(false);
+  const [showDirect, setShowDirect] = useState(false);
   const messagesEnd = useRef<HTMLDivElement>(null);
   const displayed = snapshot?.room.id === roomId ? snapshot : null;
-  const canManage = displayed && !displayed.room.isGeneral && (displayed.room.ownerId === userId || isAdmin);
+  const canManage = displayed && !displayed.room.isGeneral && !displayed.room.isDirect && (displayed.room.ownerId === userId || isAdmin);
 
   useEffect(() => {
     let disposed = false;
@@ -73,9 +74,11 @@ export default function ChatWorkspace({ initialRooms, initialSnapshot, people, u
   return <div>
     <div className="mb-5 flex items-center justify-between gap-3">
       <div><h1 className="text-2xl font-semibold text-brand-teal-dark">Team chat</h1><p className="mt-1 text-sm text-foreground/60">Your team, in one conversation. Updates every few seconds.</p></div>
+      <button type="button" className="rounded-lg border border-border px-4 py-2 text-sm" onClick={() => setShowDirect(!showDirect)}>New message</button>
       <button type="button" className="rounded-lg bg-brand-red px-4 py-2 text-sm font-semibold text-white" onClick={() => setShowCreate(!showCreate)}>New group</button>
     </div>
     {error ? <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-brand-red-dark">{error}</p> : null}
+    {showDirect ? <div className="mb-5 rounded-xl border border-border bg-card p-4"><p className="mb-3 text-sm font-medium">Choose a team member</p><div className="flex max-h-48 flex-wrap gap-2 overflow-auto">{people.filter((person) => person.id !== userId).map((person) => <button key={person.id} type="button" disabled={busy} className="rounded-lg border border-border px-3 py-2 text-sm" onClick={() => { if ((body || driveUrl) && !window.confirm("Discard your unsent message and switch conversations?")) return; void run(async () => { const result = await openDirectMessage(person.id); if (result.error) setError(result.error); else if (result.roomId) { setBody(""); setDriveUrl(""); setMentions([]); setReply(null); setBefore(null); setRoomId(result.roomId); setShowDirect(false); refresh(); } }); }}>{person.name}</button>)}</div></div> : null}
     {showCreate ? <form className="mb-5 rounded-xl border border-border bg-card p-4" onSubmit={(event) => { event.preventDefault(); void run(async () => {
       const result = await createGroup({ name: groupName, memberIds: groupMembers });
       if (result.error) { setError(result.error); return; }
@@ -87,7 +90,7 @@ export default function ChatWorkspace({ initialRooms, initialSnapshot, people, u
       <button disabled={busy} className="rounded-lg bg-brand-teal-dark px-4 py-2 text-sm text-white disabled:opacity-50">Create group</button>
     </form> : null}
     <div className="grid overflow-hidden rounded-xl border border-border bg-card md:grid-cols-[220px_1fr]">
-      <nav aria-label="Chat groups" className="flex max-h-72 gap-1 overflow-auto border-b border-border p-3 md:max-h-none md:flex-col md:border-b-0 md:border-r">{rooms.map((room) => <button key={room.id} type="button" onClick={() => switchRoom(room.id)} className={`flex shrink-0 items-center justify-between gap-2 rounded-lg p-3 text-left text-sm ${room.id === roomId ? "bg-brand-teal-dark text-white" : "hover:bg-zinc-100"}`}><span>{room.isGeneral ? "# " : ""}{room.name}</span>{room.unread > 0 ? <span className="rounded-full bg-brand-red px-2 py-0.5 text-xs text-white">{room.mentions ? "@ " : ""}{room.unread}</span> : null}</button>)}</nav>
+      <nav aria-label="Chat groups" className="flex max-h-72 gap-1 overflow-auto border-b border-border p-3 md:max-h-none md:flex-col md:border-b-0 md:border-r">{rooms.map((room) => <button key={room.id} type="button" onClick={() => switchRoom(room.id)} className={`flex shrink-0 items-center justify-between gap-2 rounded-lg p-3 text-left text-sm ${room.id === roomId ? "bg-brand-teal-dark text-white" : "hover:bg-zinc-100"}`}><span>{room.isGeneral ? "# " : room.isDirect ? "@ " : ""}{room.name}</span>{room.unread > 0 ? <span className="rounded-full bg-brand-red px-2 py-0.5 text-xs text-white">{room.mentions ? "@ " : ""}{room.unread}</span> : null}</button>)}</nav>
       <section className="min-w-0">
         {displayed ? <>
           <header className="border-b border-border px-5 py-4"><h2 className="font-semibold">{displayed.room.name}</h2><p className="text-xs text-foreground/50">{displayed.members.length} members</p>
